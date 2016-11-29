@@ -672,8 +672,10 @@ final class LeaderState extends ActiveState {
       // If the query's sequence number is greater than the session's current sequence number, queue the request for
       // handling once the state machine is caught up.
       if (entry.getSequence() > session.getCommandSequence()) {
+        LOGGER.debug("{} - Registering query entry: {}", context.getCluster().member().address(), entry);
         session.registerSequenceQuery(entry.getSequence(), () -> applyQuery(entry, future));
       } else {
+        LOGGER.debug("{} - Applying query immediately: {}", context.getCluster().member().address(), entry);
         applyQuery(entry, future);
       }
     }
@@ -785,6 +787,7 @@ final class LeaderState extends ActiveState {
       LOGGER.debug("{} - Appended {}", context.getCluster().member().address(), entry);
     }
 
+    LOGGER.debug("{} - AcceptRequest register address: {} {}", context.getCluster().member().address(), request.client(), request.address());
     context.getStateMachine().executor().context().sessions().registerAddress(request.client(), request.address());
 
     CompletableFuture<AcceptResponse> future = new CompletableFuture<>();

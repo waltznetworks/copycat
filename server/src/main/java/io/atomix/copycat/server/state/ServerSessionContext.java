@@ -79,6 +79,8 @@ class ServerSessionContext implements ServerSession {
     this.lastApplied = id - 1;
     this.context = context;
     this.timeout = timeout;
+
+    LOGGER.debug("New session: {} {}", id, client);
   }
 
   @Override
@@ -295,12 +297,15 @@ class ServerSessionContext implements ServerSession {
    * @return The server session.
    */
   ServerSessionContext setCommandSequence(long sequence) {
+
+    LOGGER.debug("{} -  Setting command sequence: {}", getAddress(), sequence);
     // For each increment of the sequence number, trigger query callbacks that are dependent on the specific sequence.
     for (long i = commandSequence + 1; i <= sequence; i++) {
       commandSequence = i;
       List<Runnable> queries = this.sequenceQueries.remove(commandSequence);
       if (queries != null) {
         for (Runnable query : queries) {
+          LOGGER.debug("{} - Running query: {}", getAddress(), query);
           query.run();
         }
         queries.clear();
@@ -389,6 +394,7 @@ class ServerSessionContext implements ServerSession {
       List<Runnable> q = queriesPool.poll();
       return q != null ? q : new ArrayList<>(128);
     });
+    LOGGER.debug("{} - Registering sequence query: {}", getAddress(), sequence);
     queries.add(query);
     return this;
   }
@@ -460,6 +466,7 @@ class ServerSessionContext implements ServerSession {
    * Sets the session connection.
    */
   ServerSessionContext setConnection(Connection connection) {
+    LOGGER.debug("{} {} - Setting connection {}", id, client, connection);
     this.connection = connection;
     return this;
   }
@@ -531,6 +538,7 @@ class ServerSessionContext implements ServerSession {
    * Commits events for the given index.
    */
   void commit(long index) {
+    LOGGER.debug("{} {} - COMMIT {} {} {}", id, client, index, event != null ? event.eventIndex : "null", event);
     if (event != null && event.eventIndex == index) {
       events.add(event);
       sendEvent(event);
@@ -559,6 +567,7 @@ class ServerSessionContext implements ServerSession {
    * @return The server session.
    */
   private ServerSessionContext clearEvents(long index) {
+    LOGGER.debug("{} {} - Clear events: {}", id, client, index);
     if (index > completeIndex) {
       EventHolder event = events.peek();
       while (event != null && event.eventIndex <= index) {
@@ -579,6 +588,7 @@ class ServerSessionContext implements ServerSession {
    */
   ServerSessionContext resendEvents(long index) {
     clearEvents(index);
+    LOGGER.debug("{} {} - RESENDEVENT: {} {}", id, client, index);
     for (EventHolder event : events) {
       sendEvent(event);
     }
@@ -589,6 +599,7 @@ class ServerSessionContext implements ServerSession {
    * Sends an event to the session.
    */
   private void sendEvent(EventHolder event) {
+    LOGGER.debug("{} {} - SENDEVENT: {} {}", id, client, event, connection);
     if (connection != null) {
       sendEvent(event, connection);
     }
@@ -605,10 +616,11 @@ class ServerSessionContext implements ServerSession {
       .withEvents(event.events)
       .build();
 
-    LOGGER.debug("{} - Sending {}", id, request);
+    LOGGER.debug("{} {} - Sending event {}", id, client, request);
     connection.<PublishRequest, PublishResponse>send(request).whenComplete((response, error) -> {
+      LOGGER.debug("{} {} - Received1: {} {}", id, client, response, error);
       if (error == null) {
-        LOGGER.debug("{} - Received {}", id, response);
+        LOGGER.debug("{} {} - Received2 {}", id, client, response);
         // If the event was received successfully, clear events up to the event index.
         if (response.status() == Response.Status.OK) {
           clearEvents(response.index());
@@ -625,6 +637,7 @@ class ServerSessionContext implements ServerSession {
    * Sets the session as suspect.
    */
   void suspect() {
+    LOGGER.debug("Marking as suspect {}", id);
     setState(State.UNSTABLE);
   }
 

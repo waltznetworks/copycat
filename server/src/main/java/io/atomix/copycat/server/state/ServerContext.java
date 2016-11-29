@@ -514,6 +514,8 @@ public class ServerContext implements AutoCloseable {
   public void connectClient(Connection connection) {
     threadContext.checkThread();
 
+    LOGGER.debug("Connecting client: {}", connection);
+
     // Note we do not use method references here because the "state" variable changes over time.
     // We have to use lambdas to ensure the request handler points to the current state.
     connection.handler(RegisterRequest.class, request -> state.register(request));
@@ -532,6 +534,7 @@ public class ServerContext implements AutoCloseable {
   public void connectServer(Connection connection) {
     threadContext.checkThread();
 
+    LOGGER.debug("Connecting server: {}", connection);
     // Handlers for all request types are registered since requests can be proxied between servers.
     // Note we do not use method references here because the "state" variable changes over time.
     // We have to use lambdas to ensure the request handler points to the current state.

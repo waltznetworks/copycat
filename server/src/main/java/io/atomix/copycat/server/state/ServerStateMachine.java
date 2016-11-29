@@ -790,6 +790,8 @@ final class ServerStateMachine implements AutoCloseable {
       // Calculate the updated timestamp for the command.
       long timestamp = executor.timestamp(entry.getTimestamp());
 
+      LOGGER.debug("{} - Applying command {} {} {}", state.getCluster().member().address(), index, sequence, entry);
+
       // Execute the command in the state machine thread. Once complete, the CompletableFuture callback will be completed
       // in the state machine thread. Register the result in that thread and then complete the future in the caller's thread.
       ServerCommit commit = commits.acquire(entry, session, timestamp);
@@ -933,7 +935,9 @@ final class ServerStateMachine implements AutoCloseable {
     executor.init(index, commit.time(), ServerStateMachineContext.Type.QUERY);
 
     try {
+      LOGGER.debug("{} - Executing commit {}", session.getAddress(), commit);
       Object result = executor.executeOperation(commit);
+      LOGGER.debug("{} - Executed commit {}", session.getAddress(), commit);
       context.executor().execute(() -> future.complete(new Result(index, eventIndex, result)));
     } catch (Exception e) {
       context.executor().execute(() -> future.complete(new Result(index, eventIndex, e)));
