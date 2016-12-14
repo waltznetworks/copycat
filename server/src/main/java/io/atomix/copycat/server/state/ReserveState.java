@@ -91,6 +91,21 @@ class ReserveState extends InactiveState {
   }
 
   @Override
+  protected CompletableFuture<CommandResponse> commandClient(CommandRequest request) {
+    context.checkThread();
+    logRequest(request);
+
+    if (!hasSessionConnection(request)) {
+      return CompletableFuture.completedFuture(logResponse(CommandResponse.builder()
+              .withStatus(Response.Status.ERROR)
+              .withError(CopycatError.Type.UNKNOWN_SESSION_ERROR)
+              .build()));
+    }
+
+    return command(request);
+  }
+
+  @Override
   protected CompletableFuture<CommandResponse> command(CommandRequest request) {
     context.checkThread();
     logRequest(request);
@@ -108,6 +123,21 @@ class ReserveState extends InactiveState {
           .build())
         .thenApply(this::logResponse);
     }
+  }
+
+  @Override
+  protected CompletableFuture<QueryResponse> queryClient(QueryRequest request) {
+    context.checkThread();
+    logRequest(request);
+
+    if (!hasSessionConnection(request)) {
+      return CompletableFuture.completedFuture(logResponse(QueryResponse.builder()
+              .withStatus(Response.Status.ERROR)
+              .withError(CopycatError.Type.UNKNOWN_SESSION_ERROR)
+              .build()));
+    }
+
+    return query(request);
   }
 
   @Override
@@ -172,9 +202,22 @@ class ReserveState extends InactiveState {
   }
 
   @Override
-  protected CompletableFuture<KeepAliveResponse> keepAlive(KeepAliveRequest request) {
+  protected CompletableFuture<KeepAliveResponse> keepAliveClient(KeepAliveRequest request) {
     context.checkThread();
     logRequest(request);
+
+    if (!hasSessionConnection(request)) {
+      return CompletableFuture.completedFuture(logResponse(KeepAliveResponse.builder()
+              .withStatus(Response.Status.ERROR)
+              .withError(CopycatError.Type.UNKNOWN_SESSION_ERROR)
+              .build()));
+    }
+
+    return keepAlive(request);
+  }
+
+  @Override
+  protected CompletableFuture<KeepAliveResponse> keepAlive(KeepAliveRequest request) {
 
     if (context.getLeader() == null) {
       return CompletableFuture.completedFuture(logResponse(KeepAliveResponse.builder()
@@ -189,6 +232,10 @@ class ReserveState extends InactiveState {
           .build())
         .thenApply(this::logResponse);
     }
+  }
+
+  protected boolean hasSessionConnection(SessionRequest request) {
+    return context.hasSessionConnection(request.session());
   }
 
   @Override

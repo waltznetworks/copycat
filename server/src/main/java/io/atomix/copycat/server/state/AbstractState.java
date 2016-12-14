@@ -132,6 +132,10 @@ abstract class AbstractState implements Managed<AbstractState> {
    */
   protected abstract CompletableFuture<KeepAliveResponse> keepAlive(KeepAliveRequest request);
 
+  protected CompletableFuture<KeepAliveResponse> keepAliveClient(KeepAliveRequest request) {
+    return keepAlive(request);
+  }
+
   /**
    * Handles an unregister request.
    */
@@ -187,10 +191,18 @@ abstract class AbstractState implements Managed<AbstractState> {
    */
   protected abstract CompletableFuture<CommandResponse> command(CommandRequest request);
 
+  protected CompletableFuture<CommandResponse> commandClient(CommandRequest request) {
+    return command(request);
+  }
+
   /**
    * Handles a query request.
    */
   protected abstract CompletableFuture<QueryResponse> query(QueryRequest request);
+
+  protected CompletableFuture<QueryResponse> queryClient(QueryRequest request) {
+    return query(request);
+  }
 
   @Override
   public CompletableFuture<Void> close() {

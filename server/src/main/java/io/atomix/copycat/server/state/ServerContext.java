@@ -39,6 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -518,10 +519,10 @@ public class ServerContext implements AutoCloseable {
     // We have to use lambdas to ensure the request handler points to the current state.
     connection.handler(RegisterRequest.class, request -> state.register(request));
     connection.handler(ConnectRequest.class, request -> state.connect(request, connection));
-    connection.handler(KeepAliveRequest.class, request -> state.keepAlive(request));
+    connection.handler(KeepAliveRequest.class, request -> state.keepAliveClient(request));
     connection.handler(UnregisterRequest.class, request -> state.unregister(request));
-    connection.handler(CommandRequest.class, request -> state.command(request));
-    connection.handler(QueryRequest.class, request -> state.query(request));
+    connection.handler(CommandRequest.class, request -> state.commandClient(request));
+    connection.handler(QueryRequest.class, request -> state.queryClient(request));
 
     connection.closeListener(stateMachine.executor().context().sessions()::unregisterConnection);
   }
@@ -672,4 +673,15 @@ public class ServerContext implements AutoCloseable {
     return getClass().getCanonicalName();
   }
 
+  public boolean hasSessionConnection(long sessionId) {
+    ServerSessionContext session = getStateMachine().executor().context().sessions().getSession(sessionId);
+    LOGGER.warn("SESSION: {}", session);
+    if (session != null) {
+      LOGGER.warn("SESSION: {} {} {} {}", session.id(), session.client(), session.getConnection(), session.getAddress());
+      if (session.getConnection() != null) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
