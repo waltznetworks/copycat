@@ -252,6 +252,8 @@ abstract class AbstractAppender implements AutoCloseable {
     // Reset the member failure count and update the member's availability status if necessary.
     succeedAttempt(member);
 
+    LOGGER.debug("AppendResponseOk: {} {}", request, response);
+
     // If replication succeeded then trigger commit futures.
     if (response.succeeded()) {
       updateMatchIndex(member, response);

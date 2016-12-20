@@ -53,6 +53,7 @@ import java.util.Queue;
  * @author <a href="http://github.com/kuujo>Jordan Halterman</a>
  */
 final class ClientSequencer {
+
   private final ClientSessionState state;
   private long requestSequence;
   private long responseSequence;
@@ -86,6 +87,7 @@ final class ClientSequencer {
    * @param callback The callback to sequence.
    */
   public void sequenceEvent(PublishRequest request, Runnable callback) {
+    state.getLogger().debug("{} {} Adding sequence event {} -> {} {}", state.getSessionId(), state.getClientId(), requestSequence, responseSequence, request);
     if (requestSequence == responseSequence) {
       callback.run();
       eventIndex = request.eventIndex();
@@ -110,6 +112,8 @@ final class ClientSequencer {
    * @param callback The callback to sequence.
    */
   public void sequenceResponse(long sequence, OperationResponse response, Runnable callback) {
+    state.getLogger().debug("{} {} Adding sequence response {} -> {} {}", state.getSessionId(), state.getClientId(), sequence, responseSequence, response);
+
     // If the request sequence number is equal to the next response sequence number, attempt to complete the response.
     if (sequence == responseSequence + 1) {
       if (completeResponse(response, callback)) {
@@ -127,12 +131,15 @@ final class ClientSequencer {
    * Completes all sequenced responses.
    */
   private void completeResponses() {
+
     // Iterate through queued responses and complete as many as possible.
     ResponseCallback response = responseCallbacks.get(responseSequence + 1);
     while (response != null) {
+      state.getLogger().debug("{} {} Complete responses {}", state.getSessionId(), state.getClientId(), responseSequence);
       // If the response was completed, remove the response callback from the response queue,
       // increment the response sequence number, and check the next response.
       if (completeResponse(response.response, response.callback)) {
+        state.getLogger().debug("{} {} Complete responses NEXT", state.getSessionId(), state.getClientId());
         responseCallbacks.remove(++responseSequence);
         response = responseCallbacks.get(responseSequence + 1);
       } else {
@@ -143,6 +150,7 @@ final class ClientSequencer {
     // Once we've completed as many responses as possible, if no more operations are outstanding
     // and events remain in the event queue, complete the events.
     if (requestSequence == responseSequence) {
+      state.getLogger().debug("{} {} Complete responses EVENT {}", state.getSessionId(), state.getClientId(), requestSequence);
       EventCallback eventCallback = eventCallbacks.poll();
       while (eventCallback != null) {
         eventCallback.run();
@@ -156,6 +164,8 @@ final class ClientSequencer {
    * Completes a sequenced response if possible.
    */
   private boolean completeResponse(OperationResponse response, Runnable callback) {
+    state.getLogger().debug("Completing response: {} {}", responseSequence, response);
+
     // If the response is null, that indicates an exception occurred. The best we can do is complete
     // the response in sequential order.
     if (response == null) {
@@ -170,6 +180,7 @@ final class ClientSequencer {
       // This is safe since we know that sequenced responses should see sequential order of events.
       EventCallback eventCallback = eventCallbacks.peek();
       while (eventCallback != null && eventCallback.request.eventIndex() <= response.eventIndex()) {
+        state.getLogger().debug("{} {} Complete response EVT {}", state.getSessionId(), state.getClientId(), eventCallback.request.eventIndex());
         eventCallbacks.remove();
         eventCallback.run();
         eventIndex = eventCallback.request.eventIndex();
@@ -180,9 +191,11 @@ final class ClientSequencer {
     // If after completing pending events the eventIndex is greater than or equal to the response's eventIndex, complete the response.
     // Note that the event protocol initializes the eventIndex to the session ID.
     if (response.eventIndex() <= eventIndex || (eventIndex == 0 && response.eventIndex() == state.getSessionId())) {
+      state.getLogger().debug("{} {} Complete response callback {} {}", state.getSessionId(), state.getClientId(), eventIndex, response.eventIndex());
       callback.run();
       return true;
     } else {
+      state.getLogger().debug("{} {} Complete response no-callback {} {}", state.getSessionId(), state.getClientId(), eventIndex, response.eventIndex());
       return false;
     }
   }

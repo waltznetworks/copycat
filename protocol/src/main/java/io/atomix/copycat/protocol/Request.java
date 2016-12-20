@@ -24,7 +24,7 @@ import io.atomix.catalyst.serializer.CatalystSerializable;
  */
 public interface Request extends CatalystSerializable {
 
-  /**
+    /**
    * Request builder.
    *
    * @param <T> The builder type.

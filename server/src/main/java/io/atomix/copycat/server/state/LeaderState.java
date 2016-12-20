@@ -372,6 +372,8 @@ final class LeaderState extends ActiveState {
     context.checkThread();
     logRequest(request);
 
+    CompletableFuture<LeaveResponse> future = new CompletableFuture<>();
+
     // If another configuration change is already under way, reject the configuration.
     // If the leader index is 0 or is greater than the commitIndex, reject the join requests.
     // Configuration changes should not be allowed until the leader has committed a no-op entry.
@@ -395,7 +397,6 @@ final class LeaderState extends ActiveState {
     Collection<Member> members = context.getCluster().members();
     members.remove(member);
 
-    CompletableFuture<LeaveResponse> future = new CompletableFuture<>();
     configure(members).whenComplete((index, error) -> {
       context.checkThread();
       if (isOpen()) {
@@ -687,8 +688,10 @@ final class LeaderState extends ActiveState {
       // If the query's sequence number is greater than the session's current sequence number, queue the request for
       // handling once the state machine is caught up.
       if (entry.getSequence() > session.getCommandSequence()) {
+        LOGGER.debug("{} - Registering query entry: {}", context.getCluster().member().address(), entry);
         session.registerSequenceQuery(entry.getSequence(), () -> applyQuery(entry, future));
       } else {
+        LOGGER.debug("{} - Applying query immediately: {}", context.getCluster().member().address(), entry);
         applyQuery(entry, future);
       }
     }
@@ -809,6 +812,7 @@ final class LeaderState extends ActiveState {
       LOGGER.debug("{} - Appended {}", context.getCluster().member().address(), entry);
     }
 
+    LOGGER.debug("{} - AcceptRequest register address: {} {}", context.getCluster().member().address(), request.client(), request.address());
     context.getStateMachine().executor().context().sessions().registerAddress(request.client(), request.address());
 
     CompletableFuture<AcceptResponse> future = new CompletableFuture<>();
@@ -861,6 +865,8 @@ final class LeaderState extends ActiveState {
     context.checkThread();
     logRequest(request);
 
+    CompletableFuture<KeepAliveResponse> future = new CompletableFuture<>();
+
     try (KeepAliveEntry entry = context.getLog().create(KeepAliveEntry.class)) {
       entry.setTerm(context.getTerm())
         .setSession(request.session())
@@ -871,7 +877,7 @@ final class LeaderState extends ActiveState {
       LOGGER.debug("{} - Appended {}", context.getCluster().member().address(), entry);
     }
 
-    CompletableFuture<KeepAliveResponse> future = new CompletableFuture<>();
+
     appender.appendEntries(index).whenComplete((commitIndex, commitError) -> {
       context.checkThread();
       if (isOpen()) {
@@ -929,6 +935,8 @@ final class LeaderState extends ActiveState {
     context.checkThread();
     logRequest(request);
 
+    CompletableFuture<UnregisterResponse> future = new CompletableFuture<>();
+
     try (UnregisterEntry entry = context.getLog().create(UnregisterEntry.class)) {
       entry.setTerm(context.getTerm())
         .setSession(request.session())
@@ -938,7 +946,6 @@ final class LeaderState extends ActiveState {
       LOGGER.debug("{} - Appended {}", context.getCluster().member().address(), entry);
     }
 
-    CompletableFuture<UnregisterResponse> future = new CompletableFuture<>();
     appender.appendEntries(index).whenComplete((commitIndex, commitError) -> {
       context.checkThread();
       if (isOpen()) {

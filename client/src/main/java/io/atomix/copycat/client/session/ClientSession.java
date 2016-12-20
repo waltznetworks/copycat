@@ -28,6 +28,8 @@ import io.atomix.copycat.client.util.AddressSelector;
 import io.atomix.copycat.client.util.ClientConnection;
 import io.atomix.copycat.session.ClosedSessionException;
 import io.atomix.copycat.session.Session;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
@@ -53,6 +55,7 @@ import java.util.function.Consumer;
  * @author <a href="http://github.com/kuujo>Jordan Halterman</a>
  */
 public class ClientSession implements Session {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ClientSession.class);
   private final ClientSessionState state;
   private final ClientConnection connection;
   private final ClientSessionManager manager;
@@ -131,6 +134,7 @@ public class ClientSession implements Session {
     if (state == State.CLOSED || state == State.EXPIRED) {
       return Futures.exceptionalFuture(new ClosedSessionException("session closed"));
     }
+    LOGGER.debug("Session -> submitter query - {} {}", query, id());
     return submitter.submit(query);
   }
 
@@ -186,6 +190,7 @@ public class ClientSession implements Session {
    * @return A completable future to be completed once the session is closed.
    */
   public CompletableFuture<Void> close() {
+    LOGGER.debug("ClientSession: Close: {} {}", state, id());
     CompletableFuture<Void> future = new CompletableFuture<>();
     submitter.close()
       .thenCompose(v -> listener.close())
@@ -210,6 +215,7 @@ public class ClientSession implements Session {
    * @return A completable future to be completed once the session has been expired.
    */
   public CompletableFuture<Void> expire() {
+    LOGGER.debug("ClientSession: Expired: {} {}", state, id());
     return manager.expire();
   }
 

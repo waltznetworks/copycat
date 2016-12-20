@@ -274,7 +274,7 @@ class PassiveState extends ReserveState {
         .build()));
     }
 
-    LOGGER.debug("{} - Forwarded {}", context.getCluster().member().address(), request);
+    LOGGER.debug("{} - Forwarded {} {}", context.getCluster().member().address(), request, context.getLeader().serverAddress());
     return this.<QueryRequest, QueryResponse>forward(request)
       .exceptionally(error -> QueryResponse.builder()
         .withStatus(Response.Status.ERROR)
@@ -315,6 +315,8 @@ class PassiveState extends ReserveState {
     // If the query's sequence number is greater than the session's current sequence number, queue the request for
     // handling once the state machine is caught up.
     if (entry.getSequence() > session.getCommandSequence()) {
+      LOGGER.debug("{} - registering sequence query {} {} {}", context.getCluster().member().address(),
+              entry.getSequence(), session.getCommandSequence(), entry);
       session.registerSequenceQuery(entry.getSequence(), () -> indexQuery(entry, future));
     } else {
       indexQuery(entry, future);
@@ -344,6 +346,8 @@ class PassiveState extends ReserveState {
     // If the query index is greater than the session's last applied index, queue the request for handling once the
     // state machine is caught up.
     if (entry.getIndex() > session.getLastApplied()) {
+      LOGGER.debug("{} - registering index sequence query {} {} {}", context.getCluster().member().address(),
+              entry.getSequence(), session.getCommandSequence(), entry);
       session.registerIndexQuery(entry.getIndex(), () -> applyQuery(entry, future));
     } else {
       applyQuery(entry, future);
@@ -354,9 +358,12 @@ class PassiveState extends ReserveState {
    * Applies a query to the state machine.
    */
   protected CompletableFuture<QueryResponse> applyQuery(QueryEntry entry, CompletableFuture<QueryResponse> future) {
+
+    LOGGER.debug("{} - Apply query {}", context.getCluster().member().address(), entry);
     // In the case of the leader, the state machine is always up to date, so no queries will be queued and all query
     // indexes will be the last applied index.
     context.getStateMachine().<ServerStateMachine.Result>apply(entry).whenComplete((result, error) -> {
+      LOGGER.debug("{} - Applied query {}", context.getCluster().member().address(), entry);
       completeOperation(result, QueryResponse.builder(), error, future);
       entry.release();
     });

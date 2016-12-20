@@ -758,6 +758,7 @@ final class ServerStateMachine implements AutoCloseable {
     // have a session. We ensure that session register/unregister entries are not compacted from the log
     // until all associated commands have been cleaned.
     if (session == null) {
+      LOGGER.debug("Apply command but session is null: {} {}", entry.getSession(), entry);
       log.release(entry.getIndex());
       return Futures.exceptionalFuture(new UnknownSessionException("unknown session: " + entry.getSession()));
     }
@@ -765,6 +766,7 @@ final class ServerStateMachine implements AutoCloseable {
     // session registry until all prior commands have been released by the state machine, but new commands can
     // only be applied for sessions in an active state.
     else if (!session.state().active()) {
+      LOGGER.debug("Apply command but session is not active: {} {}", entry.getSession(), entry);
       log.release(entry.getIndex());
       return Futures.exceptionalFuture(new UnknownSessionException("inactive session: " + entry.getSession()));
     }
@@ -772,6 +774,8 @@ final class ServerStateMachine implements AutoCloseable {
     // we've received a command that was previously applied to the state machine. Ensure linearizability by
     // returning the cached response instead of applying it to the user defined state machine.
     else if (entry.getSequence() > 0 && entry.getSequence() < session.nextCommandSequence()) {
+
+      LOGGER.debug("Apply command session sequence: {} {} {}", entry.getSession(), entry.getSequence(), session.nextCommandSequence());
       // Ensure the response check is executed in the state machine thread in order to ensure the
       // command was applied, otherwise there will be a race condition and concurrent modification issues.
       long sequence = entry.getSequence();
@@ -789,6 +793,8 @@ final class ServerStateMachine implements AutoCloseable {
 
       // Calculate the updated timestamp for the command.
       long timestamp = executor.timestamp(entry.getTimestamp());
+
+      LOGGER.debug("{} - Applying command {} {} {}", state.getCluster().member().address(), index, sequence, entry);
 
       // Execute the command in the state machine thread. Once complete, the CompletableFuture callback will be completed
       // in the state machine thread. Register the result in that thread and then complete the future in the caller's thread.
@@ -933,7 +939,9 @@ final class ServerStateMachine implements AutoCloseable {
     executor.init(index, commit.time(), ServerStateMachineContext.Type.QUERY);
 
     try {
+      LOGGER.debug("{} - Executing commit {}", session.getAddress(), commit);
       Object result = executor.executeOperation(commit);
+      LOGGER.debug("{} - Executed commit {}", session.getAddress(), commit);
       context.executor().execute(() -> future.complete(new Result(index, eventIndex, result)));
     } catch (Exception e) {
       context.executor().execute(() -> future.complete(new Result(index, eventIndex, e)));

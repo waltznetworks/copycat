@@ -102,6 +102,7 @@ final class ClientSessionState {
    */
   public ClientSessionState setState(Session.State state) {
     if (this.state != state) {
+      LOGGER.debug("ClientSessionState: New State: {} {}", state, getSessionId());
       this.state = state;
       changeListeners.forEach(l -> l.accept(state));
     }
@@ -205,6 +206,7 @@ final class ClientSessionState {
    * @return The client session state.
    */
   public ClientSessionState setEventIndex(long eventIndex) {
+    getLogger().debug("{} - New event index: {}", getSessionId(), eventIndex);
     this.eventIndex = eventIndex;
     return this;
   }
