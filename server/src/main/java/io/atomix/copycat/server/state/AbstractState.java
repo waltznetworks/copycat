@@ -74,13 +74,20 @@ abstract class AbstractState implements Managed<AbstractState> {
     return open;
   }
 
+
+
   /**
    * Forwards the given request to the leader if possible.
    */
   protected <T extends Request, U extends Response> CompletableFuture<U> forward(T request) {
     CompletableFuture<U> future = new CompletableFuture<>();
+
     context.getConnections().getConnection(context.getLeader().serverAddress()).whenComplete((connection, connectError) -> {
       if (connectError == null) {
+        if (request instanceof SessionRequest) {
+          SessionRequest sessionRequest = (SessionRequest) request;
+          sessionRequest.setForwarded();
+        }
         connection.<T, U>send(request).whenComplete((response, responseError) -> {
           if (responseError == null) {
             future.complete(response);
