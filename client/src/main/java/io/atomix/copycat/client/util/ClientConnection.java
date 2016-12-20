@@ -81,6 +81,7 @@ public class ClientConnection implements Connection {
    * @return The client connection.
    */
   public ClientConnection reset() {
+    LOGGER.debug("{} - Reset connection", id);
     selector.reset();
     return this;
   }
@@ -93,6 +94,7 @@ public class ClientConnection implements Connection {
    * @return The client connection.
    */
   public ClientConnection reset(Address leader, Collection<Address> servers) {
+    LOGGER.debug("{} - Reset connection {}", id, leader);
     selector.reset(leader, servers);
     return this;
   }
@@ -101,6 +103,7 @@ public class ClientConnection implements Connection {
   @SuppressWarnings("unchecked")
   public <T, U> CompletableFuture<U> send(T request) {
     CompletableFuture<U> future = new CompletableFuture<>();
+    LOGGER.debug("Send: {} {}", id, request);
     sendRequest((Request) request, (CompletableFuture<Response>) future);
     return future;
   }
@@ -110,6 +113,7 @@ public class ClientConnection implements Connection {
    */
   private <T extends Request, U extends Response> void sendRequest(T request, CompletableFuture<U> future) {
     if (open) {
+      LOGGER.debug("Sending request: {} {}", id, request);
       connect().whenComplete((c, e) -> sendRequest(request, c, e, future));
     }
   }
@@ -121,6 +125,7 @@ public class ClientConnection implements Connection {
     if (open) {
       if (error == null) {
         if (connection != null) {
+          LOGGER.debug("Sending request: {} {} {}", id, request, error);
           connection.<T, U>send(request).whenComplete((r, e) -> handleResponse(request, r, e, future));
         } else {
           future.completeExceptionally(new ConnectException("failed to connect"));
@@ -129,6 +134,8 @@ public class ClientConnection implements Connection {
         this.connection = null;
         next().whenComplete((c, e) -> sendRequest(request, c, e, future));
       }
+    } else {
+      LOGGER.debug("Closed connection, dropping request: {} {}", id, request);
     }
   }
 
@@ -152,6 +159,8 @@ public class ClientConnection implements Connection {
       } else {
         future.completeExceptionally(error);
       }
+    } else {
+      LOGGER.debug("Discarded response because connection is closed: {} {} {} {}", id, request, response, error);
     }
   }
 
@@ -166,6 +175,7 @@ public class ClientConnection implements Connection {
 
       CompletableFuture<Connection> future = new CompletableFuture<>();
       connectFuture = future;
+      LOGGER.debug("{} - Closing current connection to open a new one", id);
       connection.close().whenComplete((result, error) -> connect(future));
       return connectFuture.whenComplete((result, error) -> connectFuture = null);
     }
@@ -204,7 +214,7 @@ public class ClientConnection implements Connection {
       future.complete(null);
     } else {
       Address address = selector.next();
-      LOGGER.debug("Connecting to {}", address);
+      LOGGER.debug("{} - Connecting to {}", id, address);
       client.connect(address).whenComplete((c, e) -> handleConnection(address, c, e, future));
     }
   }
@@ -227,7 +237,7 @@ public class ClientConnection implements Connection {
    */
   @SuppressWarnings("unchecked")
   private void setupConnection(Address address, Connection connection, CompletableFuture<Connection> future) {
-    LOGGER.debug("Setting up connection to {}", address);
+    LOGGER.debug("{} - Setting up connection to {}", id, address);
 
     this.connection = connection;
     connection.closeListener(c -> {
@@ -300,6 +310,7 @@ public class ClientConnection implements Connection {
 
   @Override
   public CompletableFuture<Void> close() {
+    LOGGER.debug("Closing connection {}", id);
     open = false;
     return CompletableFuture.completedFuture(null);
   }

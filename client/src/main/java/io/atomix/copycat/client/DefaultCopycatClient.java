@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -85,7 +86,7 @@ public class DefaultCopycatClient implements CopycatClient {
   private void setState(State state) {
     if (this.state != state) {
       this.state = state;
-      LOGGER.debug("State changed: {}", state);
+      LOGGER.debug("State changed: {} {}", state, this.session);
       changeListeners.forEach(l -> l.accept(state));
     }
   }
@@ -136,6 +137,7 @@ public class DefaultCopycatClient implements CopycatClient {
    * Handles a session state change.
    */
   private void onStateChange(Session.State state) {
+    LOGGER.debug("{} - STATE CHANGE: {}", this.session, state);
     switch (state) {
       // When the session is opened, transition the state to CONNECTED.
       case OPEN:
@@ -217,7 +219,10 @@ public class DefaultCopycatClient implements CopycatClient {
       return Futures.exceptionalFuture(new ClosedSessionException("session closed"));
 
     BlockingFuture<T> future = new BlockingFuture<>();
+    long msgid = new Random().nextLong();
+    LOGGER.debug("Submitting query - {} {} {}", msgid, query, this.session.id());
     session.submit(query).whenComplete((result, error) -> {
+      LOGGER.debug("Response query - {} {} {} {}", msgid, query, this.session.id(), error);
       if (eventContext.isBlocked()) {
         future.accept(result, error);
       } else {

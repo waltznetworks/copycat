@@ -95,6 +95,7 @@ final class ClientSessionListener {
       return Futures.exceptionalFuture(new UnknownSessionException("incorrect session ID"));
     }
 
+    state.getLogger().debug("{} - Event indexes: {} {}", state.getSessionId(), request.eventIndex(), state.getEventIndex());
     if (request.eventIndex() <= state.getEventIndex()) {
       return CompletableFuture.completedFuture(PublishResponse.builder()
           .withStatus(Response.Status.OK)

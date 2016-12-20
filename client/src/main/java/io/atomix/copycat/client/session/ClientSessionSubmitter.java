@@ -142,7 +142,7 @@ final class ClientSessionSubmitter {
     if (state.getState() == Session.State.CLOSED || state.getState() == Session.State.EXPIRED) {
       attempt.fail(new ClosedSessionException("session closed"));
     } else {
-      state.getLogger().debug("{} - Sending {}", state.getSessionId(), attempt.request);
+      state.getLogger().debug("{} - Sending {} {}", state.getSessionId(), attempt.sequence, attempt.request);
       attempts.put(attempt.sequence, attempt);
       connection.<T, U>send(attempt.request).whenComplete(attempt);
       attempt.future.whenComplete((r, e) -> attempts.remove(attempt.sequence));
@@ -276,7 +276,7 @@ final class ClientSessionSubmitter {
     @Override
     public void accept(CommandResponse response, Throwable error) {
       if (error == null) {
-        state.getLogger().debug("{} - Received {}", state.getSessionId(), response);
+        state.getLogger().debug("{} - {} Received {}", state.getSessionId(), this.sequence, response);
         if (response.status() == Response.Status.OK) {
           complete(response);
         } else if (response.error() == CopycatError.Type.APPLICATION_ERROR) {
@@ -338,10 +338,12 @@ final class ClientSessionSubmitter {
     @Override
     public void accept(QueryResponse response, Throwable error) {
       if (error == null) {
-        state.getLogger().debug("{} - Received {}", state.getSessionId(), response);
+        state.getLogger().debug("{} - {} Received {}", state.getSessionId(), this.sequence, response);
         if (response.status() == Response.Status.OK) {
+          state.getLogger().debug("{} - {} Received OK {}", state.getSessionId(), this.sequence, response);
           complete(response);
         } else {
+          state.getLogger().debug("{} - {} Received NOK {}", state.getSessionId(), this.sequence, response.status());
           complete(response.error().createException());
         }
       } else {
